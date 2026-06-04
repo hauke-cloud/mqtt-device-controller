@@ -1,0 +1,8 @@
+Topic: stat/<bridgename>/RESULT
+
+Payload:
+{
+  "0xED0B": {
+    "Name": "room-office-romy"
+  }
+}

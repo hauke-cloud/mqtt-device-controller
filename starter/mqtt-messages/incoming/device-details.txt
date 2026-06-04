@@ -1,0 +1,3 @@
+Topic: stat/tasmota_office/RESULT
+
+{"ZbStatus3":[{"Device":"0x3A65","Name":"room-floor3","IEEEAddr":"0x00158D008C7CCC7B","ModelId":"lumi.weather","Endpoints":[1],"Config":["T01"],"Temperature":26.31,"Pressure":1019,"Humidity":45.67,"Reachable":true,"BatteryPercentage":100,"BatteryLastSeenEpoch":1779825940,"LastSeen":1128,"LastSeenEpoch":1779825940,"LinkQuality":69}]}

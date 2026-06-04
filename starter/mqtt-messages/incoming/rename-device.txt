@@ -1,0 +1,2 @@
+topic: cmnd/<bridgename>/zbname
+payload: <device short addr>,<new name>

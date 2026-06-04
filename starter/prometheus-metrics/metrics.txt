@@ -1,0 +1,5 @@
+- last_seen
+- last_updated
+- device_types
+
+etc. (choose some you think are of interest)

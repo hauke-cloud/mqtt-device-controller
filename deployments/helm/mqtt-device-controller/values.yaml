@@ -1,0 +1,67 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/hauke-cloud/iot/mqtt-device-controller
+  pullPolicy: IfNotPresent
+  tag: ""  # Defaults to Chart.appVersion
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Namespace(s) to watch for MQTTBridge / MQTTDevice CRs.
+# Empty string means all namespaces.
+watchNamespace: ""
+
+controller:
+  leaderElect: true
+  metricsBindAddress: ":8080"
+  healthProbeBindAddress: ":8081"
+  apiBindAddress: ":8443"
+
+# mTLS for the REST API.
+# Supply a pre-existing Secret name containing tls.crt, tls.key, and ca.crt,
+# or let the chart create a self-signed CA via cert-manager (set certManager.enabled=true).
+tls:
+  # Name of an existing secret with keys: tls.crt, tls.key, ca.crt
+  existingSecret: ""
+  # Mount path inside the container
+  mountPath: /tls
+
+certManager:
+  enabled: false
+  issuerRef:
+    kind: ClusterIssuer
+    name: selfsigned-issuer
+
+service:
+  type: ClusterIP
+  apiPort: 8443
+  metricsPort: 8080
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 128Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
+
+podAnnotations: {}
+podLabels: {}
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+rbac:
+  create: true
+
+# Install the MQTTDevice CRD.
+crds:
+  install: true

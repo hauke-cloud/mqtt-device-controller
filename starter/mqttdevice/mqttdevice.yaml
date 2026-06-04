@@ -1,0 +1,20 @@
+apiVersion: iot.hauke.cloud/v1alpha1
+kind: Device
+metadata:
+  name: valve-roof-right
+  namespace: mqtt
+spec:
+  bridgeRef: # automatically added by device-manager depending on bridge this device was found in. see mqttbridge
+    name: bedroom
+    namespace: iot
+  disabled: false # set by user. default: false
+  friendlyName: valve-roof-right # added by device-manager based on found friendlyName. Can we overwritten by user and will result in change in mqtt bridge (device-manager sents name change mqtt command)
+  ieeeAddr: "0xF4B3B1fffE4EA459" # added my device-manager
+  typeRef: # added by user and used to connect specific controller (like valve, roomsensor, etc.) to this mqtt device
+    apiGroup: iot.hauke.cloud
+    kind: valve
+    name: valve-roof-right
+    namespace: iot
+status:
+  lastSeenTime: "2026-06-04T13:44:38Z"
+  lastUpdatedTime: "2026-06-04T13:44:38Z"

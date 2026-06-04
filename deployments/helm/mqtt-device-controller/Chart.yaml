@@ -1,0 +1,19 @@
+apiVersion: v2
+name: mqtt-device-controller
+description: Kubernetes controller that discovers Zigbee devices via Tasmota MQTT bridges and manages MQTTDevice CRDs.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - mqtt
+  - zigbee
+  - tasmota
+  - iot
+  - kubernetes
+  - controller
+home: https://github.com/hauke-cloud/mqtt-device-controller
+sources:
+  - https://github.com/hauke-cloud/mqtt-device-controller
+maintainers:
+  - name: Hauke Mettendorf
+    email: hauke@mettendorf.it

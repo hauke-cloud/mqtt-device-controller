@@ -1,0 +1,4 @@
+GET devices # get list of all managed devices
+GET devices/<device friendlyname> # get device details
+GET devices/<device IEEE short addr> # get device details
+GET devices/<device IEEE long addr> # get device details

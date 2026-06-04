@@ -1,0 +1,3 @@
+stat/<bridgename>/RESULT
+
+{"ZbStatus1":[{"Device":"0x4F2E","Name":"valve-right"},{"Device":"0xDA76","Name":"valve-center"},{"Device":"0x0B6E","Name":"valve-left"},{"Device":"0x1934","Name":"soil-sensor-1"},{"Device":"0x5872","Name":"soil-sensor-2"},{"Device":"0x415A","Name":"soil-sensor-3"},{"Device":"0x67E4","Name":"soil-sensor-4"},{"Device":"0x8C4A","Name":"water-level-right"},{"Device":"0xA178","Name":"water-level-left"},{"Device":"0xB3CC","Name":"room-office-hauke"},{"Device":"0x3A65","Name":"room-floor3"},{"Device":"0xED0B","Name":"room-office-romy"}]}

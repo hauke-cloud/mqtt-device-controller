@@ -1,0 +1,2 @@
+topic/command: cmnd/<bridgename>/zbstatus3
+payload: <devicename/device short IEEEAddress>

@@ -1,0 +1,54 @@
+{{- if .Values.rbac.create -}}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "mqtt-device-controller.fullname" . }}
+  labels:
+    {{- include "mqtt-device-controller.labels" . | nindent 4 }}
+rules:
+  # Read MQTTBridge CRDs (read-only)
+  - apiGroups: ["iot.hauke.cloud"]
+    resources: ["mqttbridges"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["iot.hauke.cloud"]
+    resources: ["mqttbridges/status"]
+    verbs: ["get"]
+  # Full control over MQTTDevice CRDs
+  - apiGroups: ["iot.hauke.cloud"]
+    resources: ["mqttdevices"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["iot.hauke.cloud"]
+    resources: ["mqttdevices/status"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: ["iot.hauke.cloud"]
+    resources: ["mqttdevices/finalizers"]
+    verbs: ["update"]
+  # Read Secrets for bridge credentials
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+  # Leader election
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Events
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "mqtt-device-controller.fullname" . }}
+  labels:
+    {{- include "mqtt-device-controller.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "mqtt-device-controller.fullname" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "mqtt-device-controller.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}

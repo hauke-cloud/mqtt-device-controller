@@ -1,0 +1,2 @@
+topic/command: cmnd/<bridgename>/zbstatus1
+payload: none
