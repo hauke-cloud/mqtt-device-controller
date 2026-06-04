@@ -151,14 +151,15 @@ func (m *Manager) runDiscovery(ctx context.Context, bc *BridgeClient, bridge iov
 
 	m.metrics.DevicesTotal.WithLabelValues(bridge.Spec.BridgeName).Set(float64(len(items)))
 
-	seenNames := make(map[string]bool, len(items))
+	// Keyed by short address (e.g. "0x4F2E") — stable across friendly-name renames.
+	seenShortAddrs := make(map[string]bool, len(items))
 	reachableCount := 0
 
 	for _, item := range items {
-		if item.Name == "" {
+		if item.Device == "" {
 			continue
 		}
-		seenNames[item.Name] = true
+		seenShortAddrs[item.Device] = true
 
 		details, err := bc.SendZbStatus3(ctx, item.Name, zbStatus3Timeout)
 		if err != nil {
@@ -181,7 +182,7 @@ func (m *Manager) runDiscovery(ctx context.Context, bc *BridgeClient, bridge iov
 
 	m.metrics.DevicesReachable.WithLabelValues(bridge.Spec.BridgeName).Set(float64(reachableCount))
 
-	if err := m.markMissingDevicesStale(ctx, bridge, seenNames); err != nil {
+	if err := m.markMissingDevicesStale(ctx, bridge, seenShortAddrs); err != nil {
 		log.Warn("mark stale devices failed", "err", err)
 	}
 
@@ -190,7 +191,9 @@ func (m *Manager) runDiscovery(ctx context.Context, bc *BridgeClient, bridge iov
 }
 
 func (m *Manager) upsertDevice(ctx context.Context, bridge iov1.MQTTBridge, d device.ZbStatus3Item) error {
-	name := sanitizeName(d.Name)
+	// Use the short address as the stable CRD name so a friendly-name rename
+	// does not cause a second CR to be created.
+	name := sanitizeName(d.Device)
 	namespace := bridge.Namespace
 	now := metav1.NewTime(time.Now())
 
@@ -230,7 +233,7 @@ func (m *Manager) upsertDevice(ctx context.Context, bridge iov1.MQTTBridge, d de
 		return fmt.Errorf("get MQTTDevice %s: %w", name, err)
 	}
 
-	// Patch spec (only fields this controller owns).
+	// Patch spec fields owned by the controller.
 	patch := client.MergeFrom(existing.DeepCopy())
 	if existing.Spec.IEEEAddr == "" {
 		existing.Spec.IEEEAddr = d.IEEEAddr
@@ -238,10 +241,22 @@ func (m *Manager) upsertDevice(ctx context.Context, bridge iov1.MQTTBridge, d de
 	if existing.Spec.ShortAddr == "" {
 		existing.Spec.ShortAddr = d.Device
 	}
+	// Keep spec.friendlyName in sync with whatever the bridge currently reports,
+	// but only when the DeviceReconciler is not mid-rename (annotation == spec means
+	// a confirmed rename is complete; annotation != spec means rename is in flight).
 	if existing.Annotations == nil {
 		existing.Annotations = make(map[string]string)
 	}
-	existing.Annotations[iov1.AnnotationBridgeFriendlyName] = d.Name
+	bridgeSideName := existing.Annotations[iov1.AnnotationBridgeFriendlyName]
+	if bridgeSideName == existing.Spec.FriendlyName {
+		// No rename in flight — safe to update both spec and annotation.
+		existing.Spec.FriendlyName = d.Name
+		existing.Annotations[iov1.AnnotationBridgeFriendlyName] = d.Name
+	} else {
+		// Rename in flight (DeviceReconciler hasn't confirmed yet) —
+		// only update the annotation so the reconciler can detect completion.
+		existing.Annotations[iov1.AnnotationBridgeFriendlyName] = d.Name
+	}
 	if err := m.k8s.Patch(ctx, &existing, patch); err != nil {
 		return fmt.Errorf("patch MQTTDevice %s: %w", name, err)
 	}
@@ -296,7 +311,7 @@ func (m *Manager) markMissingDevicesStale(ctx context.Context, bridge iov1.MQTTB
 
 	for i := range list.Items {
 		dev := &list.Items[i]
-		if seen[dev.Spec.FriendlyName] {
+		if seen[dev.Spec.ShortAddr] {
 			continue
 		}
 		k8smeta.SetStatusCondition(&dev.Status.Conditions, metav1.Condition{
