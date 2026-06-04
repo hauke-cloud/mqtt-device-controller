@@ -13,5 +13,5 @@ RUN CGO_ENABLED=${CGO_ENABLED} GOOS=linux go build \
 
 FROM gcr.io/distroless/static:nonroot
 COPY --from=builder /build/controller /controller
-USER nonroot:nonroot
+USER 65532:65532
 ENTRYPOINT ["/controller"]
