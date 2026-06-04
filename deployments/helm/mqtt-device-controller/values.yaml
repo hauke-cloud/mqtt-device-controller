@@ -1,9 +1,9 @@
 replicaCount: 1
 
 image:
-  repository: ghcr.io/hauke-cloud/iot/mqtt-device-controller
+  repository: ghcr.io/hauke-cloud/mqtt-device-controller
   pullPolicy: IfNotPresent
-  tag: ""  # Defaults to Chart.appVersion
+  tag: "" # Defaults to Chart.appVersion
 
 imagePullSecrets: []
 nameOverride: ""
@@ -65,3 +65,34 @@ rbac:
 # Install the MQTTDevice CRD.
 crds:
   install: true
+
+serviceMonitor:
+  # Set to true if the Prometheus Operator is installed and you want automatic
+  # scrape configuration.
+  enabled: false
+  # Namespace to deploy the ServiceMonitor into. Defaults to Release.Namespace.
+  namespace: ""
+  # Labels added to the ServiceMonitor (use to match your Prometheus instance's
+  # serviceMonitorSelector, e.g. release: kube-prometheus-stack).
+  additionalLabels: {}
+  interval: 30s
+  scrapeTimeout: 10s
+  relabelings: []
+  metricRelabelings: []
+
+prometheusRule:
+  # Set to true to deploy bundled alerting rules.
+  enabled: false
+  # Namespace to deploy the PrometheusRule into. Defaults to Release.Namespace.
+  namespace: ""
+  # Labels added to the PrometheusRule (must match your Prometheus instance's
+  # ruleSelector, e.g. release: kube-prometheus-stack).
+  additionalLabels: {}
+  # How long a bridge must be disconnected before MQTTBridgeDisconnected fires.
+  bridgeDisconnectedFor: 2m
+  # How long devices must be unreachable before ZigbeeDeviceUnreachable fires.
+  deviceUnreachableFor: 5m
+  # Battery percentage below which ZigbeeDeviceBatteryLow fires.
+  batteryLowThreshold: 20
+  # Seconds without a report before ZigbeeDeviceNotSeen fires.
+  deviceNotSeenSeconds: 300
