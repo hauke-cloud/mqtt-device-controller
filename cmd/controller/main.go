@@ -75,9 +75,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	ctx := ctrl.SetupSignalHandler()
+
 	// Index MQTTDevice by spec.bridgeRef.name so markMissingDevicesStale can list efficiently.
 	if err := mgr.GetFieldIndexer().IndexField(
-		ctrl.SetupSignalHandler(),
+		ctx,
 		&iov1.MQTTDevice{},
 		"spec.bridgeRef.name",
 		func(obj client.Object) []string {
@@ -113,8 +115,6 @@ func main() {
 		log.Error("unable to create API server", "err", err)
 		os.Exit(1)
 	}
-
-	ctx := ctrl.SetupSignalHandler()
 
 	go func() {
 		if err := apiServer.Start(ctx); err != nil {
