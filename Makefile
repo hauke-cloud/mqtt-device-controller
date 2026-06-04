@@ -11,7 +11,7 @@ build: fmt vet
 	CGO_ENABLED=0 go build -o $(LOCALBIN)/controller ./cmd/controller/
 
 test: setup-envtest
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-path $(LOCALBIN) -p path)" \
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" \
 		go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
 
 lint: fmt vet
@@ -32,7 +32,7 @@ manifests:
 
 setup-envtest:
 	@mkdir -p $(LOCALBIN)
-	$(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-path $(LOCALBIN)
+	$(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN)
 
 docker-build:
 	docker build -t mqtt-device-controller:latest .
