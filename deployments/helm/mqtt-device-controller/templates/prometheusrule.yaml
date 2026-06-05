@@ -1,0 +1,80 @@
+{{- if .Values.prometheusRule.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "mqtt-device-controller.fullname" . }}
+  namespace: {{ .Values.prometheusRule.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "mqtt-device-controller.labels" . | nindent 4 }}
+    {{- with .Values.prometheusRule.additionalLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  groups:
+    - name: mqtt-device-controller.bridges
+      interval: 1m
+      rules:
+        - alert: MQTTBridgeDisconnected
+          expr: mqtt_device_controller_bridge_connected == 0
+          for: {{ .Values.prometheusRule.bridgeDisconnectedFor | default "2m" }}
+          labels:
+            severity: warning
+          annotations:
+            summary: "MQTT bridge {{ "{{" }} $labels.bridge {{ "}}" }} is disconnected"
+            description: >-
+              The controller lost its MQTT connection to bridge
+              {{ "{{" }} $labels.bridge {{ "}}" }} and has been unable to reconnect
+              for more than {{ .Values.prometheusRule.bridgeDisconnectedFor | default "2m" }}.
+
+        - alert: MQTTDiscoveryFailing
+          expr: |
+            rate(mqtt_device_controller_discovery_runs_total{status="error"}[10m]) > 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Discovery failing on bridge {{ "{{" }} $labels.bridge {{ "}}" }}"
+            description: >-
+              Discovery cycles on bridge {{ "{{" }} $labels.bridge {{ "}}" }} have been
+              failing continuously for the past 5 minutes.
+
+    - name: mqtt-device-controller.devices
+      interval: 1m
+      rules:
+        - alert: ZigbeeDeviceUnreachable
+          expr: |
+            mqtt_device_controller_devices_reachable / mqtt_device_controller_devices_total < 0.5
+          for: {{ .Values.prometheusRule.deviceUnreachableFor | default "5m" }}
+          labels:
+            severity: warning
+          annotations:
+            summary: "More than half the devices on bridge {{ "{{" }} $labels.bridge {{ "}}" }} are unreachable"
+            description: >-
+              Less than 50 % of Zigbee devices on bridge {{ "{{" }} $labels.bridge {{ "}}" }}
+              are reachable. This may indicate a bridge or coordinator issue.
+
+        - alert: ZigbeeDeviceBatteryLow
+          expr: |
+            mqtt_device_controller_device_battery_percentage < {{ .Values.prometheusRule.batteryLowThreshold | default 20 }}
+          for: 10m
+          labels:
+            severity: info
+          annotations:
+            summary: "Low battery on {{ "{{" }} $labels.device {{ "}}" }}"
+            description: >-
+              Device {{ "{{" }} $labels.device {{ "}}" }} on bridge {{ "{{" }} $labels.bridge {{ "}}" }}
+              reports {{ "{{" }} $value | humanize {{ "}}" }} % battery remaining.
+
+        - alert: ZigbeeDeviceNotSeen
+          expr: |
+            mqtt_device_controller_device_last_seen_seconds
+              > {{ .Values.prometheusRule.deviceNotSeenSeconds | default 300 }}
+          for: 2m
+          labels:
+            severity: info
+          annotations:
+            summary: "Device {{ "{{" }} $labels.device {{ "}}" }} has not been seen recently"
+            description: >-
+              Device {{ "{{" }} $labels.device {{ "}}" }} on bridge {{ "{{" }} $labels.bridge {{ "}}" }}
+              has not reported in {{ "{{" }} $value | humanizeDuration {{ "}}" }}.
+{{- end }}
