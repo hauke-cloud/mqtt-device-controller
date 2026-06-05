@@ -161,9 +161,9 @@ func (m *Manager) runDiscovery(ctx context.Context, bc *BridgeClient, bridge iov
 		}
 		seenShortAddrs[item.Device] = true
 
-		details, err := bc.SendZbStatus3(ctx, item.Name, zbStatus3Timeout)
+		details, err := bc.SendZbStatus3(ctx, item.Device, zbStatus3Timeout)
 		if err != nil {
-			log.Warn("ZbStatus3 failed", "device", item.Name, "err", err)
+			log.Warn("ZbStatus3 failed", "device", item.Device, "err", err)
 			continue
 		}
 		if details.Reachable {

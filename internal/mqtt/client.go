@@ -22,7 +22,7 @@ type BridgeClient struct {
 
 	mu           sync.Mutex
 	zbStatus1Ch  chan []device.ZbStatus1Item
-	zbStatus3Chs map[string]chan device.ZbStatus3Item // keyed by device friendly name
+	zbStatus3Chs map[string]chan device.ZbStatus3Item // keyed by device short address (Device field)
 
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
@@ -113,13 +113,13 @@ func (bc *BridgeClient) handleMessage(_ pahomqtt.Client, msg pahomqtt.Message) {
 		bc.mu.Lock()
 		defer bc.mu.Unlock()
 		for _, item := range items {
-			if ch, ok := bc.zbStatus3Chs[item.Name]; ok {
+			if ch, ok := bc.zbStatus3Chs[item.Device]; ok {
 				select {
 				case ch <- item:
 				default:
 				}
 			} else {
-				bc.log.Debug("no pending ZbStatus3 waiter for device", "device", item.Name)
+				bc.log.Debug("no pending ZbStatus3 waiter for device", "device", item.Device)
 			}
 		}
 
@@ -149,20 +149,20 @@ func (bc *BridgeClient) SendZbStatus1(ctx context.Context, timeout time.Duration
 	}
 }
 
-// SendZbStatus3 publishes a ZbStatus3 request for a named device and waits for the response.
-func (bc *BridgeClient) SendZbStatus3(ctx context.Context, deviceName string, timeout time.Duration) (device.ZbStatus3Item, error) {
+// SendZbStatus3 publishes a ZbStatus3 request for a device (by short address) and waits for the response.
+func (bc *BridgeClient) SendZbStatus3(ctx context.Context, shortAddr string, timeout time.Duration) (device.ZbStatus3Item, error) {
 	ch := make(chan device.ZbStatus3Item, 1)
 	bc.mu.Lock()
-	bc.zbStatus3Chs[deviceName] = ch
+	bc.zbStatus3Chs[shortAddr] = ch
 	bc.mu.Unlock()
 	defer func() {
 		bc.mu.Lock()
-		delete(bc.zbStatus3Chs, deviceName)
+		delete(bc.zbStatus3Chs, shortAddr)
 		bc.mu.Unlock()
 	}()
 
 	topic := fmt.Sprintf("cmnd/%s/ZbStatus3", bc.bridge.Spec.BridgeName)
-	token := bc.client.Publish(topic, 1, false, deviceName)
+	token := bc.client.Publish(topic, 1, false, shortAddr)
 	if !token.WaitTimeout(5 * time.Second) {
 		return device.ZbStatus3Item{}, fmt.Errorf("publish ZbStatus3: timeout")
 	}
@@ -174,7 +174,7 @@ func (bc *BridgeClient) SendZbStatus3(ctx context.Context, deviceName string, ti
 	case item := <-ch:
 		return item, nil
 	case <-time.After(timeout):
-		return device.ZbStatus3Item{}, fmt.Errorf("ZbStatus3 response timeout for device %q", deviceName)
+		return device.ZbStatus3Item{}, fmt.Errorf("ZbStatus3 response timeout for device %q", shortAddr)
 	case <-ctx.Done():
 		return device.ZbStatus3Item{}, ctx.Err()
 	}
