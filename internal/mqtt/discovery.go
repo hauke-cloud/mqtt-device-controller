@@ -210,6 +210,10 @@ func (m *Manager) upsertDevice(ctx context.Context, bridge iov1.MQTTBridge, d de
 	err := m.k8s.Get(ctx, nsName, &existing)
 
 	if k8serrors.IsNotFound(err) {
+		friendlyName := d.Name
+		if friendlyName == "" {
+			friendlyName = d.Device
+		}
 		dev := iov1.MQTTDevice{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      name,
@@ -220,7 +224,7 @@ func (m *Manager) upsertDevice(ctx context.Context, bridge iov1.MQTTBridge, d de
 			},
 			Spec: iov1.MQTTDeviceSpec{
 				BridgeRef:    iov1.ObjectRef{Name: bridge.Name, Namespace: bridge.Namespace},
-				FriendlyName: d.Name,
+				FriendlyName: friendlyName,
 				IEEEAddr:     d.IEEEAddr,
 				ShortAddr:    d.Device,
 			},
@@ -247,15 +251,17 @@ func (m *Manager) upsertDevice(ctx context.Context, bridge iov1.MQTTBridge, d de
 	if existing.Annotations == nil {
 		existing.Annotations = make(map[string]string)
 	}
-	bridgeSideName := existing.Annotations[iov1.AnnotationBridgeFriendlyName]
-	if bridgeSideName == existing.Spec.FriendlyName {
-		// No rename in flight — safe to update both spec and annotation.
-		existing.Spec.FriendlyName = d.Name
-		existing.Annotations[iov1.AnnotationBridgeFriendlyName] = d.Name
-	} else {
-		// Rename in flight (DeviceReconciler hasn't confirmed yet) —
-		// only update the annotation so the reconciler can detect completion.
-		existing.Annotations[iov1.AnnotationBridgeFriendlyName] = d.Name
+	if d.Name != "" {
+		bridgeSideName := existing.Annotations[iov1.AnnotationBridgeFriendlyName]
+		if bridgeSideName == existing.Spec.FriendlyName {
+			// No rename in flight — safe to update both spec and annotation.
+			existing.Spec.FriendlyName = d.Name
+			existing.Annotations[iov1.AnnotationBridgeFriendlyName] = d.Name
+		} else {
+			// Rename in flight (DeviceReconciler hasn't confirmed yet) —
+			// only update the annotation so the reconciler can detect completion.
+			existing.Annotations[iov1.AnnotationBridgeFriendlyName] = d.Name
+		}
 	}
 	if err := m.k8s.Patch(ctx, &existing, patch); err != nil {
 		return fmt.Errorf("patch MQTTDevice %s: %w", name, err)
