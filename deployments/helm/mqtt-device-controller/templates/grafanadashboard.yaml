@@ -1,0 +1,269 @@
+{{- if .Values.grafanaDashboard.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "mqtt-device-controller.fullname" . }}-dashboard
+  namespace: {{ .Values.grafanaDashboard.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "mqtt-device-controller.labels" . | nindent 4 }}
+    grafana_dashboard: "1"
+    {{- with .Values.grafanaDashboard.additionalLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.grafanaDashboard.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+data:
+  mqtt-device-controller.json: |-
+    {
+      "title": "MQTT Device Controller",
+      "uid": "mqtt-device-controller",
+      "schemaVersion": 39,
+      "version": 1,
+      "refresh": "30s",
+      "time": {"from": "now-3h", "to": "now"},
+      "tags": ["iot", "mqtt", "zigbee"],
+      "templating": {
+        "list": [
+          {
+            "current": {},
+            "hide": 0,
+            "includeAll": false,
+            "multi": false,
+            "name": "datasource",
+            "options": [],
+            "query": "prometheus",
+            "refresh": 1,
+            "type": "datasource"
+          },
+          {
+            "current": {},
+            "datasource": {"type": "prometheus", "uid": "${datasource}"},
+            "definition": "label_values(mqtt_device_controller_bridge_connected, bridge)",
+            "hide": 0,
+            "includeAll": true,
+            "multi": true,
+            "name": "bridge",
+            "query": {"query": "label_values(mqtt_device_controller_bridge_connected, bridge)", "refId": "StandardVariableQuery"},
+            "refresh": 2,
+            "sort": 1,
+            "type": "query"
+          }
+        ]
+      },
+      "panels": [
+        {
+          "id": 1,
+          "title": "Bridge Connection State",
+          "type": "stat",
+          "gridPos": {"h": 4, "w": 12, "x": 0, "y": 0},
+          "datasource": {"type": "prometheus", "uid": "${datasource}"},
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+            "textMode": "value_and_name"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "0": {"text": "Disconnected", "color": "red", "index": 0},
+                    "1": {"text": "Connected", "color": "green", "index": 1}
+                  }
+                }
+              ],
+              "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]},
+              "color": {"mode": "thresholds"}
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "${datasource}"},
+              "expr": "mqtt_device_controller_bridge_connected{bridge=~\"$bridge\"}",
+              "legendFormat": "{{`{{bridge}}`}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "Devices Reachable",
+          "type": "stat",
+          "gridPos": {"h": 4, "w": 12, "x": 12, "y": 0},
+          "datasource": {"type": "prometheus", "uid": "${datasource}"},
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+            "textMode": "value_and_name"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 1}, {"color": "green", "value": 1}]},
+              "color": {"mode": "thresholds"}
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "${datasource}"},
+              "expr": "mqtt_device_controller_devices_reachable{bridge=~\"$bridge\"}",
+              "legendFormat": "{{`{{bridge}}`}} reachable",
+              "refId": "A"
+            },
+            {
+              "datasource": {"type": "prometheus", "uid": "${datasource}"},
+              "expr": "mqtt_device_controller_devices_total{bridge=~\"$bridge\"}",
+              "legendFormat": "{{`{{bridge}}`}} total",
+              "refId": "B"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "Device Battery Levels",
+          "type": "table",
+          "gridPos": {"h": 10, "w": 12, "x": 0, "y": 4},
+          "datasource": {"type": "prometheus", "uid": "${datasource}"},
+          "options": {
+            "sortBy": [{"displayName": "Battery %", "desc": true}],
+            "footer": {"show": false}
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "custom": {"displayMode": "color-background"},
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {"color": "red", "value": null},
+                  {"color": "orange", "value": 20},
+                  {"color": "yellow", "value": 40},
+                  {"color": "green", "value": 60}
+                ]
+              },
+              "color": {"mode": "thresholds"}
+            },
+            "overrides": [
+              {
+                "matcher": {"id": "byName", "options": "bridge"},
+                "properties": [{"id": "custom.width", "value": 150}]
+              },
+              {
+                "matcher": {"id": "byName", "options": "device"},
+                "properties": [{"id": "custom.width", "value": 200}]
+              }
+            ]
+          },
+          "transformations": [
+            {"id": "labelsToFields", "options": {"mode": "columns"}},
+            {"id": "organize", "options": {"excludeByName": {"Time": true, "__name__": true}, "renameByName": {"Value": "Battery %"}}}
+          ],
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "${datasource}"},
+              "expr": "mqtt_device_controller_device_battery_percentage{bridge=~\"$bridge\"}",
+              "legendFormat": "{{`{{bridge}}`}} / {{`{{device}}`}}",
+              "instant": true,
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "Discovery Runs",
+          "type": "timeseries",
+          "gridPos": {"h": 10, "w": 12, "x": 12, "y": 4},
+          "datasource": {"type": "prometheus", "uid": "${datasource}"},
+          "options": {
+            "legend": {"displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "sum"]},
+            "tooltip": {"mode": "multi"}
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": {"fillOpacity": 5, "spanNulls": true}
+            },
+            "overrides": [
+              {
+                "matcher": {"id": "byFrameRefID", "options": "B"},
+                "properties": [{"id": "color", "value": {"fixedColor": "red", "mode": "fixed"}}]
+              }
+            ]
+          },
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "${datasource}"},
+              "expr": "rate(mqtt_device_controller_discovery_runs_total{bridge=~\"$bridge\", status=\"success\"}[5m])",
+              "legendFormat": "{{`{{bridge}}`}} success",
+              "refId": "A"
+            },
+            {
+              "datasource": {"type": "prometheus", "uid": "${datasource}"},
+              "expr": "rate(mqtt_device_controller_discovery_runs_total{bridge=~\"$bridge\", status=\"error\"}[5m])",
+              "legendFormat": "{{`{{bridge}}`}} error",
+              "refId": "B"
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "Discovery Duration (P99)",
+          "type": "timeseries",
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 14},
+          "datasource": {"type": "prometheus", "uid": "${datasource}"},
+          "options": {
+            "legend": {"displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"]},
+            "tooltip": {"mode": "multi"}
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "custom": {"fillOpacity": 5, "spanNulls": true}
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "${datasource}"},
+              "expr": "histogram_quantile(0.99, sum by (bridge, le) (rate(mqtt_device_controller_discovery_duration_seconds_bucket{bridge=~\"$bridge\"}[5m])))",
+              "legendFormat": "{{`{{bridge}}`}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "title": "MQTT Messages Received Rate",
+          "type": "timeseries",
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 14},
+          "datasource": {"type": "prometheus", "uid": "${datasource}"},
+          "options": {
+            "legend": {"displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "mean"]},
+            "tooltip": {"mode": "multi"}
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": {"fillOpacity": 5, "spanNulls": true}
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "${datasource}"},
+              "expr": "rate(mqtt_device_controller_mqtt_messages_received_total{bridge=~\"$bridge\"}[5m])",
+              "legendFormat": "{{`{{bridge}}`}} / {{`{{topic_type}}`}}",
+              "refId": "A"
+            }
+          ]
+        }
+      ]
+    }
+{{- end }}
