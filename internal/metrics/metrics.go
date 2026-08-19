@@ -8,15 +8,16 @@ import (
 const namespace = "mqtt_device_controller"
 
 type Metrics struct {
-	DevicesTotal        *prometheus.GaugeVec
-	DevicesReachable    *prometheus.GaugeVec
-	DiscoveryRunsTotal  *prometheus.CounterVec
-	DiscoveryDuration   *prometheus.HistogramVec
-	DeviceLastSeenAge   *prometheus.GaugeVec
-	DeviceBattery       *prometheus.GaugeVec
-	BridgeConnected     *prometheus.GaugeVec
-	MessagesReceived    *prometheus.CounterVec
-	RenameTotal         *prometheus.CounterVec
+	DevicesTotal          *prometheus.GaugeVec
+	DevicesReachable      *prometheus.GaugeVec
+	DiscoveryRunsTotal    *prometheus.CounterVec
+	DiscoveryDuration     *prometheus.HistogramVec
+	DeviceLastSeenAge     *prometheus.GaugeVec
+	DeviceBattery         *prometheus.GaugeVec
+	BridgeConnected       *prometheus.GaugeVec
+	MessagesReceived      *prometheus.CounterVec
+	RenameTotal           *prometheus.CounterVec
+	DeviceCollisionsTotal *prometheus.CounterVec
 }
 
 func New(reg prometheus.Registerer) *Metrics {
@@ -76,5 +77,11 @@ func New(reg prometheus.Registerer) *Metrics {
 			Name:      "device_renames_total",
 			Help:      "Total rename commands issued per bridge.",
 		}, []string{"bridge", "status"}),
+
+		DeviceCollisionsTotal: factory.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "device_short_addr_collisions_total",
+			Help:      "Discovery reports ignored because the short address is already owned by another bridge.",
+		}, []string{"bridge", "device"}),
 	}
 }

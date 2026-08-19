@@ -8,8 +8,10 @@ import (
 	iov1 "github.com/hauke-cloud/mqtt-device-controller/api/v1alpha1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 // BridgeReconciler watches MQTTBridge CRDs and keeps the MQTT Manager in sync.
@@ -44,8 +46,14 @@ func (r *BridgeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 }
 
 func (r *BridgeReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	// Only react to spec changes. MQTTBridge.status is written continuously by
+	// the bridge operator (messagesReceived alone ticks several times a
+	// minute), and without this predicate every one of those writes reaches
+	// Manager.Reconcile and recycles the MQTT connection.
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&iov1.MQTTBridge{}).
+		For(&iov1.MQTTBridge{},
+			builder.WithPredicates(predicate.GenerationChangedPredicate{}),
+		).
 		WithOptions(controller.Options{MaxConcurrentReconciles: 5}).
 		Complete(r)
 }

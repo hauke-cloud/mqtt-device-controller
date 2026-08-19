@@ -2,6 +2,8 @@ package mqtt
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"regexp"
@@ -69,6 +71,13 @@ func (m *Manager) Reconcile(ctx context.Context, bridge iov1.MQTTBridge) error {
 	defer m.mu.Unlock()
 
 	if existing, ok := m.clients[key]; ok {
+		// Nothing that affects the connection changed, so keep the live client.
+		// Tearing it down here would drop every subscription and restart
+		// discovery on any MQTTBridge write at all — including the status
+		// updates another controller makes several times a minute.
+		if connectionEqual(existing.bridge, bridge) && existing.credsFingerprint == credsFingerprint(username, password) {
+			return nil
+		}
 		existing.Disconnect()
 		if cancel, ok := m.cancels[key]; ok {
 			cancel()
@@ -237,6 +246,27 @@ func (m *Manager) upsertDevice(ctx context.Context, bridge iov1.MQTTBridge, d de
 		return fmt.Errorf("get MQTTDevice %s: %w", name, err)
 	}
 
+	// Guard against short-address collisions between bridges. A Zigbee short
+	// address is only unique within one coordinator's network, and a
+	// coordinator keeps a stale entry for a device that has since been
+	// re-paired elsewhere. Because the CR is keyed by short address alone, two
+	// bridges otherwise land on the same object and overwrite
+	// spec.friendlyName past each other on every discovery cycle — which the
+	// DeviceReconciler then answers with an endless stream of renames.
+	// Only the bridge already recorded on the CR may write to it.
+	if owner := existing.Spec.BridgeRef.Name; owner != "" && owner != bridge.Name {
+		m.metrics.DeviceCollisionsTotal.WithLabelValues(bridge.Spec.BridgeName, name).Inc()
+		m.log.Warn("short address collision: device is owned by another bridge, ignoring report",
+			"device", name,
+			"owner", owner,
+			"reportingBridge", bridge.Name,
+			"reportedName", d.Name,
+			"ieeeAddr", d.IEEEAddr,
+			"hint", fmt.Sprintf("if this is a stale entry, drop it with: cmnd/%s/ZbForget %s",
+				bridge.Spec.BridgeName, d.Device))
+		return nil
+	}
+
 	// Patch spec fields owned by the controller.
 	patch := client.MergeFrom(existing.DeepCopy())
 	if existing.Spec.IEEEAddr == "" {
@@ -365,6 +395,37 @@ func (m *Manager) resolveCredentials(ctx context.Context, bridge iov1.MQTTBridge
 
 func bridgeKey(bridge iov1.MQTTBridge) string {
 	return fmt.Sprintf("%s/%s", bridge.Namespace, bridge.Name)
+}
+
+// connectionEqual reports whether two revisions of an MQTTBridge describe the
+// same MQTT connection, i.e. whether an existing client can be kept as-is.
+// Status fields are deliberately ignored — they change constantly.
+func connectionEqual(a, b iov1.MQTTBridge) bool {
+	if a.Spec.BridgeName != b.Spec.BridgeName ||
+		a.Spec.Host != b.Spec.Host ||
+		effectivePort(a.Spec.Port) != effectivePort(b.Spec.Port) ||
+		a.Spec.DeviceType != b.Spec.DeviceType ||
+		a.Spec.DiscoveryEnabled != b.Spec.DiscoveryEnabled ||
+		effectiveBackoff(a.Spec.MaxReconnectBackoffSeconds) != effectiveBackoff(b.Spec.MaxReconnectBackoffSeconds) {
+		return false
+	}
+	if len(a.Spec.Topics) != len(b.Spec.Topics) {
+		return false
+	}
+	for i := range a.Spec.Topics {
+		if a.Spec.Topics[i] != b.Spec.Topics[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// credsFingerprint derives a comparable token from the resolved MQTT
+// credentials so a rotated Secret still forces a reconnect, without keeping a
+// second copy of the password around for the lifetime of the client.
+func credsFingerprint(username, password string) string {
+	sum := sha256.Sum256([]byte(username + "\x00" + password))
+	return hex.EncodeToString(sum[:])
 }
 
 func sanitizeName(name string) string {

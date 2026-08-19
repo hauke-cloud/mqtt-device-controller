@@ -20,6 +20,10 @@ type BridgeClient struct {
 	log     *slog.Logger
 	metrics *metrics.Metrics
 
+	// credsFingerprint identifies the credentials this client connected with,
+	// so Manager.Reconcile can tell a rotated Secret from an unchanged one.
+	credsFingerprint string
+
 	mu           sync.Mutex
 	zbStatus1Ch  chan []device.ZbStatus1Item
 	zbStatus3Chs map[string]chan device.ZbStatus3Item // keyed by device short address (Device field)
@@ -31,11 +35,12 @@ type BridgeClient struct {
 // newBridgeClient creates and connects a BridgeClient. It does not start the discovery loop.
 func newBridgeClient(ctx context.Context, bridge iov1.MQTTBridge, username, password string, log *slog.Logger, m *metrics.Metrics) (*BridgeClient, error) {
 	bc := &BridgeClient{
-		bridge:       bridge,
-		log:          log.With("bridge", bridge.Spec.BridgeName),
-		metrics:      m,
-		zbStatus1Ch:  make(chan []device.ZbStatus1Item, 1),
-		zbStatus3Chs: make(map[string]chan device.ZbStatus3Item),
+		bridge:           bridge,
+		log:              log.With("bridge", bridge.Spec.BridgeName),
+		metrics:          m,
+		credsFingerprint: credsFingerprint(username, password),
+		zbStatus1Ch:      make(chan []device.ZbStatus1Item, 1),
+		zbStatus3Chs:     make(map[string]chan device.ZbStatus3Item),
 	}
 
 	opts := pahomqtt.NewClientOptions().
