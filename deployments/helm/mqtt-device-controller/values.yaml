@@ -88,6 +88,19 @@ prometheusRule:
   # Labels added to the PrometheusRule (must match your Prometheus instance's
   # ruleSelector, e.g. release: kube-prometheus-stack).
   additionalLabels: {}
+  # Enable or disable individual alerts. Rule groups without any enabled alert
+  # are omitted; if every alert is disabled, no PrometheusRule is rendered.
+  rules:
+    MQTTBridgeDisconnected:
+      enabled: true
+    MQTTDiscoveryFailing:
+      enabled: true
+    ZigbeeDeviceUnreachable:
+      enabled: true
+    ZigbeeDeviceBatteryLow:
+      enabled: true
+    ZigbeeDeviceNotSeen:
+      enabled: true
   # How long a bridge must be disconnected before MQTTBridgeDisconnected fires.
   bridgeDisconnectedFor: 2m
   # How long devices must be unreachable before ZigbeeDeviceUnreachable fires.
